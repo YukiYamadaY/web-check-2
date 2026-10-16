@@ -22,12 +22,12 @@ from urllib.parse import urlparse
 import requests
 
 # ================= 設定 =================
-CHECK_INTERVAL_SEC = 8         # 巡回間隔（秒）
+CHECK_INTERVAL_SEC = 2         # 巡回間隔（秒）。取得時間込みで実際は約2.5〜3秒おき
 MAX_RUN_SEC = 5.5 * 3600       # 1回の実行の最大時間
 QUIET_START_HOUR = 15          # 日本時間この時刻から停止
 QUIET_END_HOUR = 9             # 日本時間この時刻まで停止
 PERSIST_EVERY_SEC = 20 * 60    # 記録ファイルを保存する間隔
-MAX_NOTIFY_PER_CHECK = 50     # 1回で通知する最大件数（10件ずつまとめて送信）
+MAX_NOTIFY_PER_CHECK = 50      # 1回で通知する最大件数（10件ずつまとめて送信）
 
 TARGET_URLS = [u.strip() for u in os.environ.get("TARGET_URLS", "").split(",") if u.strip()]
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "")
@@ -114,14 +114,16 @@ def fetch_items(session, url: str, debug: bool = False) -> list[dict]:
             continue
         variants = p.get("variants") or [{}]
         images = p.get("images") or [{}]
-        price = variants[0].get("price")
+        # 在庫のあるバリエーションを優先して購入リンクに使う
+        v = next((x for x in variants if x.get("available", True)), variants[0])
         title = " ".join(x for x in [p.get("vendor") or "", p.get("title") or ""] if x).strip()
         items.append({
             "id": str(p.get("id")),
             "url": f"{base}/products/{p.get('handle')}",
             "title": title or "(タイトル取得不可)",
-            "price": price,
+            "price": v.get("price"),
             "img": images[0].get("src", ""),
+            "buy": f"{base}/cart/{v.get('id')}:1" if v.get("id") else "",
         })
 
     if debug:
@@ -138,11 +140,16 @@ def make_embed(item: dict) -> dict:
         "color": 0x3498DB,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+    lines = []
     if item.get("price"):
         try:
-            embed["description"] = f"¥{int(float(item['price'])):,}"
+            lines.append(f"¥{int(float(item['price'])):,}")
         except Exception:
-            embed["description"] = str(item["price"])
+            lines.append(str(item["price"]))
+    if item.get("buy"):
+        lines.append(f"[⚡ レジへ直行して購入]({item['buy']})")
+    if lines:
+        embed["description"] = "\n".join(lines)
     if item["img"]:
         embed["image"] = {"url": item["img"]}
     return embed
@@ -214,7 +221,7 @@ def main():
         elif new_items:
             log(f"新着 {len(new_items)}件を検知・通知")
             notify_batch(new_items[:MAX_NOTIFY_PER_CHECK])
-        elif cycle % 50 == 0:
+        elif cycle % 200 == 0:
             log(f"異常なし（{len(all_items)}件監視中・{cycle}回目）")
 
         seen.update(it["id"] for it in all_items)
@@ -224,7 +231,7 @@ def main():
             persist_to_repo()
             last_persist = time.time()
 
-        time.sleep(max(2.0, CHECK_INTERVAL_SEC + random.uniform(-1.5, 1.5)))
+        time.sleep(max(1.0, CHECK_INTERVAL_SEC + random.uniform(-0.5, 0.5)))
 
     save_seen(seen)
     persist_to_repo()
