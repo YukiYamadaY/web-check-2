@@ -24,8 +24,8 @@ import requests
 # ================= 設定 =================
 CHECK_INTERVAL_SEC = 2         # 巡回間隔（秒）。取得時間込みで実際は約2.5〜3秒おき
 MAX_RUN_SEC = 5.5 * 3600       # 1回の実行の最大時間
-QUIET_START_HOUR = 15          # 日本時間この時刻から停止
-QUIET_END_HOUR = 9             # 日本時間この時刻まで停止
+QUIET_START_HOUR = 24       # 日本時間この時刻から停止
+QUIET_END_HOUR = 0            # 日本時間この時刻まで停止
 PERSIST_EVERY_SEC = 20 * 60    # 記録ファイルを保存する間隔
 MAX_NOTIFY_PER_CHECK = 50      # 1回で通知する最大件数（10件ずつまとめて送信）
 
