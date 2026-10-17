@@ -2,7 +2,7 @@ name: run
 
 on:
   schedule:
-    - cron: "*/30 0-5 * * *"
+        - cron: "7,22,37,52 * * * *"
   workflow_dispatch: {}
 
 permissions:
